@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function role() { return isSignedIn() ? userDoc().role : null; }
+    function isAdmin() { return role() == 'admin'; }
+    function isTeacher() { return role() == 'teacher' && userDoc().status == 'active'; }
+    function isStudent() { return role() == 'student'; }
+    function isOwner(userId) { return isSignedIn() && uid() == userId; }
+
+    // Users: a user can read/update their own profile; only admins can read/list all users
+    // (needed for teacher approval & student management) or change roles/status.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId); // signup writes their own doc with role 'student' or 'teacher'
+      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Courses: public read (catalog), only admin/teacher can write.
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // Enrollments: student can read their own; teacher can read for their batch; admin all.
+    match /enrollments/{enrollmentId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.studentId == uid()) || isTeacher();
+      allow create: if isStudent() && request.resource.data.studentId == uid();
+      allow update, delete: if isAdmin();
+    }
+
+    // Live Classes: students of the course can read; only teacher/admin schedule.
+    match /liveClasses/{classId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // Batches: readable by enrolled students/assigned teacher/admin; writable by admin/teacher.
+    match /batches/{batchId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // Course content (videos/notes): enrolled students & everyone signed-in can read;
+    // only teacher/admin upload metadata (the actual file lives in Storage).
+    match /courseContent/{contentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // Assignments & Tests: students read; teacher/admin write.
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+    match /tests/{testId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+    match /testAttempts/{attemptId} {
+      allow read: if isAdmin() || isTeacher() || (isSignedIn() && resource.data.studentId == uid());
+      allow create: if isStudent() && request.resource.data.studentId == uid();
+      allow update: if isAdmin() || isTeacher();
+    }
+
+    // Submissions: student creates their own; teacher/admin can read & grade.
+    match /submissions/{submissionId} {
+      allow read: if isAdmin() || isTeacher() || (isSignedIn() && resource.data.studentId == uid());
+      allow create: if isStudent() && request.resource.data.studentId == uid();
+      allow update: if isAdmin() || isTeacher(); // grading
+    }
+
+    // Attendance: teacher/admin write freely; student can create their own record
+    // (auto-marked "present" when they join a live class) and read all records.
+    match /attendance/{recordId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || isTeacher() || (isStudent() && request.resource.data.studentId == uid());
+      allow update, delete: if isAdmin() || isTeacher();
+    }
+
+    // Certificates: student reads their own; anyone can read for public QR verification;
+    // teacher/admin issue them.
+    match /certificates/{certId} {
+      allow read: if true; // needed for public QR-code verification page
+      allow create: if isAdmin() || isTeacher();
+      allow update, delete: if isAdmin();
+    }
+
+    // Site settings: everyone can read (e.g. maintenance mode banner), only admin writes.
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Announcements: everyone signed in can read; only admin posts.
+    match /announcements/{postId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Contact / admission form submissions: anyone can create, only admin can read/manage.
+    match /contactMessages/{msgId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+    match /admissions/{applicationId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

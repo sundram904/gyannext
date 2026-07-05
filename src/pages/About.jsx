@@ -42,7 +42,7 @@ export default function About() {
         <div className="container-app grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
           <div className="relative mx-auto max-w-sm">
             <div className="aspect-square overflow-hidden rounded-3xl bg-brand-gradient shadow-glow">
-              <img src="https://i.pravatar.cc/400?img=68" alt="Founder" className="h-full w-full object-cover mix-blend-luminosity opacity-90" />
+              <img src="profile.png" alt="Founder" className="h-full w-full object-cover mix-blend-luminosity opacity-90" />
             </div>
             <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 rounded-2xl border border-white/60 dark:border-white/10 bg-white dark:bg-ink-900 px-5 py-3 shadow-card text-center">
               <p className="font-display text-sm font-bold text-ink-900 dark:text-white">Sundram Kumar</p>
